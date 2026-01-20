@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>ExpirySmart</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <style>
+    body {
+      font-family: "Segoe UI", Arial, sans-serif;
+      background: #f4f6f8;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    .card {
+      background: #ffffff;
+      width: 100%;
+      max-width: 420px;
+      padding: 30px;
+      border-radius: 16px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 5px;
+      color: #2c3e50;
+    }
+
+    p.subtitle {
+      text-align: center;
+      color: #6b7280;
+      font-size: 14px;
+      margin-bottom: 25px;
+    }
+
+    label {
+      font-size: 14px;
+      font-weight: 600;
+      color: #374151;
+      display: block;
+      margin-top: 15px;
+    }
+
+    input {
+      width: 100%;
+      padding: 12px;
+      margin-top: 6px;
+      border-radius: 10px;
+      border: 1px solid #d1d5db;
+      font-size: 14px;
+    }
+
+    input:focus {
+      outline: none;
+      border-color: #2563eb;
+    }
+
+    button {
+      width: 100%;
+      padding: 12px;
+      margin-top: 15px;
+      border-radius: 12px;
+      border: none;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .scan-btn {
+      background: #e5e7eb;
+      color: #111827;
+    }
+
+    .submit-btn {
+      background: #2563eb;
+      color: #ffffff;
+      margin-top: 20px;
+    }
+
+    video {
+      width: 100%;
+      margin-top: 15px;
+      border-radius: 12px;
+      display: none;
+    }
+
+    .status {
+      text-align: center;
+      font-size: 13px;
+      margin-top: 10px;
+      color: #374151;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="card">
+    <h1>ExpirySmart</h1>
+    <p class="subtitle">Add product manually or scan barcode</p>
+
+    <form id="productForm">
+
+      <label>Product Name or Barcode</label>
+      <input type="text" id="productName" placeholder="Enter product name" required>
+
+      <button type="button" class="scan-btn" id="scanBtn">
+        Scan Barcode
+      </button>
+
+      <video id="video"></video>
+      <div class="status" id="scanStatus"></div>
+
+      <label>Expiry Date</label>
+      <input type="date" id="expiryDate" required>
+
+      <button type="submit" class="submit-btn">
+        Save Product
+      </button>
+
+    </form>
+
+    <div class="status" id="finalStatus"></div>
+  </div>
+
+  <script>
+    const productName = document.getElementById("productName");
+    const scanBtn = document.getElementById("scanBtn");
+    const video = document.getElementById("video");
+    const scanStatus = document.getElementById("scanStatus");
+    const finalStatus = document.getElementById("finalStatus");
+
+    // Barcode scanning
+    scanBtn.addEventListener("click", async () => {
+      if (!("BarcodeDetector" in window)) {
+        scanStatus.innerText = "Barcode scanning not supported. Enter manually.";
+        return;
+      }
+
+      const detector = new BarcodeDetector({
+        formats: ["ean_13", "code_128", "upc_a"]
+      });
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment" }
+      });
+
+      video.srcObject = stream;
+      video.style.display = "block";
+      video.play();
+
+      scanStatus.innerText = "Scanning barcode...";
+
+      const interval = setInterval(async () => {
+        const codes = await detector.detect(video);
+        if (codes.length > 0) {
+          productName.value = codes[0].rawValue;
+          scanStatus.innerText = "Barcode detected";
+
+          clearInterval(interval);
+          stream.getTracks().forEach(t => t.stop());
+          video.style.display = "none";
+        }
+      }, 1000);
+    });
+
+    // Form submit (ready for Google Sheets)
+    document.getElementById("productForm").addEventListener("submit", e => {
+  e.preventDefault();
+
+  const data = {
+    productName: document.getElementById("productName").value,
+    expiryDate: document.getElementById("expiryDate").value
+  };
+
+  fetch("https://script.google.com/macros/s/AKfycbyDy3aXqHNt_WsoesvQPZEaTfP97zOJ1plXfXbb6tW6nSweoWxlJ1rwGOoIoHaEXHmb/exec", {
+    method: "POST",
+    body: JSON.stringify(data)
+  })
+  .then(() => {
+    finalStatus.innerText = "Product saved successfully";
+    finalStatus.style.color = "green";
+    e.target.reset();
+  })
+  .catch(() => {
+    finalStatus.innerText = "Error saving product";
+    finalStatus.style.color = "red";
+  });
+});
+
+
+      // Here you will later add fetch() to Google Apps Script
+
+  </script>
+
+</body>
+</html>
+
